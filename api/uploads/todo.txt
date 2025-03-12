@@ -1,0 +1,4 @@
+Al modificar los datos en cache, el orden debe ser descendente
+Si selecciono una actividad y luego la elimino, esta inhabilita el botón de "conectar"
+
+-> Si me desconecto y me vuelvo a conectar, el cache genera datos duplicados
