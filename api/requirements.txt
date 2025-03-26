@@ -3,3 +3,7 @@ Flask-CORS
 requests
 python-dotenv
 openai
+PyPDF2
+langchain
+faiss-cpu
+langchain-community
