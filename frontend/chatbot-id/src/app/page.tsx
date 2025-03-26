@@ -1,11 +1,5 @@
 "use client";
 
-import React, { Key, useEffect, useRef, useState } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import Cookies from "js-cookie";
-
-// UI components (modifica según tu estructura)
 import {
   ChatBubble,
   ChatBubbleAction,
@@ -18,254 +12,346 @@ import { Button } from "@/components/ui/button";
 import {
   CopyIcon,
   CornerDownLeft,
+  Mic,
   Paperclip,
   RefreshCcw,
+  Volume2,
 } from "lucide-react";
+import React, { Key, useEffect, useRef, useState } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import Cookies from "js-cookie";
 
-// Definimos tipo local de mensaje
+// *** NEW: Extend your message type to allow attachments
 type ChatMessage = {
-  role: "user" | "assistant";
+  role: string;
   content: string;
-  attachments?: { name: string }[];
+  attachments?: { name: string }[]; // we store array of {name}
 };
 
 const ChatAiIcons = [
-  { icon: CopyIcon, label: "Copy" },
-  { icon: RefreshCcw, label: "Refresh" },
+  {
+    icon: CopyIcon,
+    label: "Copy",
+  },
+  {
+    icon: RefreshCcw,
+    label: "Refresh",
+  },
 ];
 
 export default function Home() {
-  const [conversationId, setConversationId] = useState<string | null>(null);
-
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState<string>("");
+  // *** NEW: We now use ChatMessage type
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [latexContent, setLatexContent] = useState(""); // Para .tex (opcional)
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [latexContent, setLatexContent] = useState<string>(""); // Para manejar el contenido LaTeX
 
   const messagesRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  // Al montar, si ya hay un convId en cookies, lo usamos
   useEffect(() => {
-    const existingConv = Cookies.get("conversation_id");
-    if (existingConv) {
-      console.log("Conversation cookie found:", existingConv);
-      setConversationId(existingConv);
-      fetchHistory(existingConv);
-    } else {
-      // Creamos un conv nuevo
-      createNewConversation();
-    }
+    const handleExistingThread = async () => {
+      const threadId = Cookies.get("thread_id");
+      if (threadId) {
+        console.log(`Cookie ya existe ${threadId}`);
+        await fetchThreadHistory();
+        await fetchDocument();
+      }
+    };
+
+    handleExistingThread();
   }, []);
 
-  // Auto-scroll al final cuando cambian messages
   useEffect(() => {
     if (messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }
-    // Podrías cargar .tex (usando conv_id) si lo deseas.
+    fetchDocument();
   }, [messages]);
 
-  // Crea un nuevo conv ID
-  const createNewConversation = async () => {
-    try {
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/start`, {
-        method: "GET",
-      });
-      if (!resp.ok) {
-        throw new Error(`Error creating conversation: ${resp.statusText}`);
-      }
-      const data = await resp.json();
-      const newConvId = data.conversation_id;
-      Cookies.set("conversation_id", newConvId, { expires: 1 / 24 });
-      setConversationId(newConvId);
-      console.log("New conversation_id:", newConvId);
-    } catch (error) {
-      console.error("Failed to create conversation:", error);
+  const fetchDocument = async () => {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/readTextFile?thread_id=${Cookies.get(
+        "thread_id"
+      )}`
+    );
+    if (!response.ok) {
+      throw new Error(`Error fetching history: ${response.statusText}`);
     }
+    const data = await response.json();
+    setLatexContent(data["response"]);
   };
 
-  // Fetch local history from /history if you store it
-  const fetchHistory = async (convId: string) => {
-    // Optional: if your backend has an endpoint "/history?conversation_id=..."
+  const fetchThreadHistory = async () => {
     try {
-      const resp = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/history?conversation_id=${convId}`
+      const threadId = Cookies.get("thread_id");
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/threadHistory?thread_id=${threadId}`
       );
-      if (resp.ok) {
-        const data = await resp.json();
-        // data.data = array of messages
-        if (data.data) setMessages(data.data);
+      if (!response.ok) {
+        throw new Error(`Error fetching history: ${response.statusText}`);
       }
-    } catch (error) {
-      console.error("Error fetching conversation history:", error);
-    }
-  };
 
-  // Subir archivos al pipeline
-  const handleFileUpload = async () => {
-    if (!conversationId || attachedFiles.length === 0) return;
+      const data = await response.json();
 
-    const formData = new FormData();
-    formData.append("conversation_id", conversationId);
-    attachedFiles.forEach((f) => formData.append("files", f));
-
-    try {
-      const resp = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
+      setMessages(
+        data.data.map(
+          (message: { role: any; content: { text: { value: any } }[] }) => ({
+            role: message.role,
+            content: message.content[0]?.text?.value || "",
+          })
+        )
       );
-      if (!resp.ok) {
-        throw new Error(`File upload failed: ${resp.statusText}`);
-      }
-      const data = await resp.json();
-      console.log("Files uploaded:", data.message);
-    } catch (err) {
-      console.error("Error uploading files:", err);
-    } finally {
-      // Limpia la lista de adjuntos
-      setAttachedFiles([]);
+    } catch (error) {
+      console.error("Error fetching thread history:", error);
     }
   };
 
-  // Al mandar texto -> /chat pipeline
-  const handleSendMessage = async () => {
-    if (!conversationId || !input.trim()) return;
+  const fetchNewThread = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/start`);
+      if (!response.ok) {
+        throw new Error(`Error fetching thread: ${response.statusText}`);
+      }
+      const data = await response.json();
+
+      // data tiene: { thread_id, assistant_id, vector_store_id }
+      // Guardarlos en cookies
+      Cookies.set("thread_id", data.thread_id, { expires: 1 / 24 }); // 1 hora
+      Cookies.set("assistant_id", data.assistant_id, { expires: 1 / 24 });
+      Cookies.set("vector_store_id", data.vector_store_id, { expires: 1 / 24 });
+
+      return {
+        thread_id: data.thread_id,
+        assistant_id: data.assistant_id,
+        vector_store_id: data.vector_store_id,
+      };
+    } catch (error) {
+      console.error("Error fetching thread:", error);
+      return null;
+    }
+  };
+
+  // Simulated handlers
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
+
+  // *** NEW: Al mandar mensaje, añade attachments en el mensaje "user"
+  //  y limpia attachedFiles al final (después de la respuesta).
+  const handleSendMessage = async (userInput: string) => {
     setIsLoading(true);
 
-    // Añadimos el mensaje "user" al local
-    const newUserMsg: ChatMessage = { role: "user", content: input };
-    if (attachedFiles.length > 0) {
-      newUserMsg.attachments = attachedFiles.map((f) => ({ name: f.name }));
-    }
-
-    setMessages((prev) => [...prev, newUserMsg]);
+    // 1) Añadimos un "mensaje de usuario" al estado con attachments
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: userInput,
+        attachments: attachedFiles.map((f) => ({ name: f.name })), // *** store names
+      },
+    ]);
 
     try {
-      // Primero subimos archivos (si hay)
-      if (attachedFiles.length > 0) {
-        await handleFileUpload(); // sube e ingesta
+      let threadId = Cookies.get("thread_id");
+      let assistantId = Cookies.get("assistant_id");
+      let vectorStoreId = Cookies.get("vector_store_id");
+
+      if (!threadId || !assistantId || !vectorStoreId) {
+        const newData = await fetchNewThread();
+        if (newData) {
+          threadId = newData.thread_id;
+          assistantId = newData.assistant_id;
+          vectorStoreId = newData.vector_store_id;
+          console.log("Cookies creadas para nueva conversación efímera");
+        } else {
+          console.log("Error al generar el thread");
+          return;
+        }
       }
 
-      // Llamamos a /chat con conversation_id y el "message"
+      // 2) Creamos FormData con message y los archivos
       const formData = new FormData();
-      formData.append("conversation_id", conversationId);
-      formData.append("message", input);
+      formData.append("message", userInput);
+      formData.append("thread_id", threadId ?? "");
+      formData.append("assistant_id", assistantId ?? "");
+      formData.append("vector_store_id", vectorStoreId ?? "");
 
-      const resp = await fetch(
+      attachedFiles.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      // *** NO limpiamos "attachedFiles" aquí todavía
+
+      const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/chat`,
         {
           method: "POST",
           body: formData,
         }
       );
-      if (!resp.ok) {
-        throw new Error(`Error: ${resp.statusText}`);
-      }
-      const data = await resp.json();
 
-      // Añadimos la respuesta "assistant"
-      const newAssistMsg: ChatMessage = {
-        role: "assistant",
-        content: data.response || "",
-      };
-      setMessages((prev) => [...prev, newAssistMsg]);
+      if (!response.ok) {
+        throw new Error(`Error sending message: ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+
+      // 3) Añadimos la respuesta del asistente al estado
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: responseData.response },
+      ]);
     } catch (error) {
-      console.error("Failed to send message:", error);
+      console.error("Error sending message:", error);
     } finally {
-      setInput("");
       setIsLoading(false);
       setIsGenerating(false);
+      // *** NEW: Limpiamos la lista de archivos para el próximo envío
+      setAttachedFiles([]);
     }
   };
 
-  // Manejador de submit
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Manejador de formulario para enviar el mensaje
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setInput("");
     if (!input.trim()) return;
-    setIsGenerating(true);
-    handleSendMessage();
+    await handleSendMessage(input);
   };
 
-  // Manejador de input-file
+  // *** La parte de adjuntar archivos
   const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       setAttachedFiles((prev) => [...prev, ...Array.from(files)]);
     }
+    // e.target.value = ""; // si quieres permitir subir el mismo archivo repetido
   };
 
-  // Acciones (copy, refresh)
-  const handleActionClick = (action: string, index: number) => {
-    if (action === "Copy") {
-      navigator.clipboard.writeText(messages[index].content);
+  const reload = async () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 1000); // Simulated reload
+  };
+
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsGenerating(true);
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }
-    else if (action === "Refresh") {
-      console.log("Refresh clicked");
+    handleSubmit(e);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (isGenerating || isLoading || !input) return;
+      onSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
+    }
+  };
+
+  const handleActionClick = async (action: string, messageIndex: number) => {
+    console.log("Action clicked:", action, "Message index:", messageIndex);
+    if (action === "Refresh") {
+      setIsGenerating(true);
+      try {
+        await reload();
+      } catch (error) {
+        console.error("Error reloading:", error);
+      } finally {
+        setIsGenerating(false);
+      }
+    }
+
+    if (action === "Copy") {
+      const message = messages[messageIndex];
+      if (message && message.role === "assistant") {
+        navigator.clipboard.writeText(message.content);
+      }
     }
   };
 
   return (
     <>
       <header className="h-[10vh] w-full flex items-center justify-between bg-background px-6 py-4 shadow-md">
+        {/* Logo */}
         <div className="flex items-center gap-2">
           <img src="/logo_icono.jpg" alt="Logo" className="h-8 object-contain" />
         </div>
+        {/* Mi Cuenta Button */}
         <Button variant="ghost" size="default" className="gap-1.5">
           Mi Cuenta
         </Button>
       </header>
 
       <main className="h-[75vh] w-full flex items-center justify-center mx-auto py-6">
-        <div className={`${latexContent ? "w-3/5" : "w-full max-w-6xl"} h-full px-4`}>
+        <div
+          className={`${
+            latexContent === "" ? "w-full max-w-6xl h-full" : "w-3/5 h-full px-4"
+          }`}
+        >
           <ChatMessageList ref={messagesRef}>
+            {/* Initial Message */}
             {messages.length === 0 && (
               <div className="w-full bg-background shadow-sm border rounded-lg p-8 flex flex-col gap-2">
-                <h1 className="font-bold">IA Disclosure</h1>
+                <h1 className="font-bold">IA para invention disclosure</h1>
                 <p className="text-muted-foreground text-sm">
-                  Use esta interfaz para subir documentos e interactuar con la IA.
+                  Esta aplicación web está diseñada para ayudar a generar divulgaciones de
+                  invención completas de manera eficiente. Impulsada por la integración de
+                  IA, simplifica el proceso de detallar los aspectos técnicos e innovadores
+                  de su invención.
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  ¡Explore las funciones de soporte intuitivas disponibles y haga que su
+                  proceso de divulgación de invención sea más sencillo que nunca!
                 </p>
               </div>
             )}
 
-            {messages.map((msg, i) => (
+            {/* Messages */}
+            {messages.map((message, index) => (
               <ChatBubble
-                key={i}
-                variant={msg.role === "user" ? "sent" : "received"}
+                key={index}
+                variant={message.role === "user" ? "sent" : "received"}
               >
                 <ChatBubbleAvatar
                   src=""
-                  fallback={msg.role === "user" ? "👨🏽" : "🤖"}
+                  fallback={message.role === "user" ? "👨🏽" : "🤖"}
                 />
                 <ChatBubbleMessage>
-                  <Markdown remarkPlugins={[remarkGfm]}>{msg.content}</Markdown>
-                  {msg.attachments && msg.attachments.length > 0 && (
+                  <Markdown remarkPlugins={[remarkGfm]}>{message.content}</Markdown>
+
+                  {/* *** NEW: Si el mensaje tiene attachments, mostramos un clip + lista */}
+                  {message.attachments && message.attachments.length > 0 && (
                     <div className="flex items-center mt-1.5 gap-2">
                       <Paperclip className="size-4" />
                       <ul className="text-sm">
-                        {msg.attachments.map((att, idx) => (
-                          <li key={idx}>{att.name}</li>
+                        {message.attachments.map((att, attIndex) => (
+                          <li key={attIndex}>{att.name}</li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  {msg.role === "assistant" &&
-                    i === messages.length - 1 &&
+
+                  {/* Botones en la burbuja si es el último mensaje del assistant */}
+                  {message.role === "assistant" &&
+                    index === messages.length - 1 &&
                     !isGenerating && (
                       <div className="flex items-center mt-1.5 gap-1">
-                        {ChatAiIcons.map((icon, idx2) => {
+                        {ChatAiIcons.map((icon, iconIndex) => {
                           const Icon = icon.icon;
                           return (
                             <ChatBubbleAction
                               variant="outline"
                               className="size-6"
-                              key={idx2}
+                              key={iconIndex}
                               icon={<Icon className="size-3" />}
-                              onClick={() => handleActionClick(icon.label, i)}
+                              onClick={() => handleActionClick(icon.label, index)}
                             />
                           );
                         })}
@@ -275,6 +361,7 @@ export default function Home() {
               </ChatBubble>
             ))}
 
+            {/* Loading */}
             {isGenerating && (
               <ChatBubble variant="received">
                 <ChatBubbleAvatar src="" fallback="🤖" />
@@ -285,14 +372,15 @@ export default function Home() {
 
           <div className="w-full px-2">
             <form
-              onSubmit={handleSubmit}
+              ref={formRef}
+              onSubmit={onSubmit}
               className="relative rounded-lg border bg-background focus-within:ring-1 focus-within:ring-ring"
             >
               {attachedFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {attachedFiles.map((file, idx) => (
+                  {attachedFiles.map((file, index) => (
                     <div
-                      key={idx}
+                      key={index}
                       className="flex items-center gap-2 p-2 bg-muted rounded-md border"
                     >
                       <Paperclip className="size-4" />
@@ -304,7 +392,7 @@ export default function Home() {
                         size="icon"
                         onClick={() =>
                           setAttachedFiles((prev) =>
-                            prev.filter((_, fIndex) => fIndex !== idx)
+                            prev.filter((_, i) => i !== index)
                           )
                         }
                       >
@@ -315,11 +403,12 @@ export default function Home() {
                   ))}
                 </div>
               )}
-
               <ChatInput
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Escriba su mensaje..."
+                onKeyDown={onKeyDown}
+                onChange={handleInputChange}
+                placeholder="Escriba su mensaje aquí..."
+                className="min-h-12 resize-none rounded-lg bg-background border-0 p-3 shadow-none focus-visible:ring-0"
               />
               <div className="flex items-center p-3 pt-0">
                 <input
@@ -329,7 +418,7 @@ export default function Home() {
                   style={{ display: "none" }}
                   onChange={(e) => {
                     handleFileAttach(e);
-                    // e.target.value = ""; // si quieres permitir volver a subir el mismo archivo
+                    e.target.value = ""; // Resetea el valor del input (opcional)
                   }}
                 />
                 <Button
@@ -348,7 +437,7 @@ export default function Home() {
                   size="sm"
                   className="ml-auto gap-1.5"
                 >
-                  Enviar
+                  Enviar mensaje
                   <CornerDownLeft className="size-3.5" />
                 </Button>
               </div>
@@ -356,7 +445,7 @@ export default function Home() {
           </div>
         </div>
 
-        {latexContent && (
+        {latexContent !== "" && (
           <div className="w-2/5 px-2 h-full overflow-auto">
             <h2 className="text-lg font-bold mb-4">Vista Previa LaTeX</h2>
             <div className="border p-4 rounded-lg bg-gray-100">
