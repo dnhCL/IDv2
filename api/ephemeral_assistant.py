@@ -4,6 +4,8 @@ import os
 from openai import OpenAI
 from assistant_instructions import instructions  # Tus instrucciones base, si las tienes
 from dotenv import load_dotenv
+import shutil
+
 
 # Cargamos variables de entorno
 load_dotenv()
@@ -20,16 +22,64 @@ def start_ephemeral_conversation():
     3) Crea un nuevo hilo (thread).
     4) Devuelve (thread_id, assistant_id, vector_store_id).
     """
-    # (A) Creamos el vector store
-    vector_store_response = client.beta.vector_stores.create(name="EphemeralStore")
-    vector_store_id = vector_store_response.id
+    # (A) Creamos vector store
+    vs_response = client.beta.vector_stores.create(name="EphemeralStore")
+    vector_store_id = vs_response.id
+    print(f"[start_ephemeral_conversation] Created vector store: {vector_store_id}")
 
-    # (B) Creamos un assistant que use ese vector store para file_search
+    # Archivos a subir
+    FILES_TO_UPLOAD = [
+        {
+            "path": "E:/Daniel/ID_ICONO/InvestigationDisclosureAI-main/api/invention-disclosure-structure.tex",
+            "copy_to_local": True  # solo este debe guardarse como .tex para editar en frontend
+        },
+        {
+            "path": "E:/Daniel/ID_ICONO/InvestigationDisclosureAI-main/api/invention-disclosure-instructions.md",
+            "copy_to_local": False
+        }
+    ]
+
+    # Subimos los archivos al vector store
+    for file_info in FILES_TO_UPLOAD:
+        path = file_info["path"]
+        try:
+            with open(path, "rb") as f:
+                file_response = client.files.create(file=f, purpose="assistants")
+                file_id = file_response.id
+                print(f"[start_ephemeral_conversation] Uploaded file {path} with ID: {file_id}")
+
+                client.beta.vector_stores.files.create(
+                    vector_store_id=vector_store_id,
+                    file_id=file_id
+                )
+                print(f"[start_ephemeral_conversation] Associated file to vector store")
+        except Exception as e:
+            print(f"[start_ephemeral_conversation] ERROR uploading file '{path}': {e}")
+
+    # (C) Creamos el assistant
     new_assistant = client.beta.assistants.create(
-        name="EphemeralAssistant",  # Puedes ponerle otro nombre
-        instructions=instructions,  # Si tienes un string con tus system prompts
-        model="gpt-3.5-turbo-0125",
-        tools=[{"type": "file_search"}],
+        name="EphemeralAssistant",
+        instructions=instructions,
+        model="gpt-4o",
+        tools=[
+            {"type": "file_search"},
+            {
+                "type": "function",
+                "function": {
+                    "name": "modify_document",
+                    "description": "Modify a LaTeX document section by replacing placeholder with given content.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "Section": {"type": "string"},
+                            "Content": {"type": "string"},
+                        },
+                        "required": ["Section", "Content"]
+                    }
+                }
+            }
+        ]
+        ,
         tool_resources={
             "file_search": {
                 "vector_store_ids": [vector_store_id]
@@ -38,11 +88,24 @@ def start_ephemeral_conversation():
     )
     assistant_id = new_assistant.id
 
-    # (C) Creamos el thread
+    # Creamos el thread
     thread = client.beta.threads.create()
     thread_id = thread.id
+    print(f"[start_ephemeral_conversation] Created thread: {thread_id}")
+
+    # Copiamos localmente SOLO el .tex para edición en frontend
+    try:
+        tex_file = FILES_TO_UPLOAD[0]["path"]  # asumimos que es el primero
+        os.makedirs("generatedDocuments", exist_ok=True)
+        local_copy = f"generatedDocuments/{thread_id}.tex"
+        shutil.copyfile(tex_file, local_copy)
+        print(f"[start_ephemeral_conversation] Copied LaTeX to: {local_copy}")
+    except Exception as e:
+        print(f"[start_ephemeral_conversation] ERROR copying LaTeX locally: {e}")
+
 
     return thread_id, assistant_id, vector_store_id
+
 
 
 def end_ephemeral_conversation(assistant_id: str, vector_store_id: str):

@@ -6,6 +6,9 @@ from flask import Flask, request, jsonify
 import requests
 import json
 from flask_cors import CORS
+from ephemeral_assistant import start_ephemeral_conversation, end_ephemeral_conversation
+
+
 
 # Carga variables de entorno
 load_dotenv('.env')
@@ -17,52 +20,6 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 app = Flask(__name__)
 CORS(app)
 
-# --------------------------------------------------------------------------------
-# 1) Lógica EFÍMERA: crear/terminar un assistant + vector store para cada hilo
-# --------------------------------------------------------------------------------
-
-def create_ephemeral_assistant():
-    """
-    Crea un vector store, crea un assistant (con la tool 'file_search'),
-    y crea un hilo (thread). Retorna (thread_id, assistant_id, vector_store_id).
-    """
-    # (A) Creamos vector store
-    vs_response = client.beta.vector_stores.create(name="EphemeralStore")
-    vector_store_id = vs_response.id
-    print(f"[create_ephemeral_assistant] Created vector store: {vector_store_id}")
-
-    # (B) Creamos assistant que use ese vector store con 'file_search'
-    new_assistant = client.beta.assistants.create(
-        name="EphemeralAssistant",
-        instructions="Eres un assistant para una sesión efímera. Usa 'file_search' cuando requieras info de los archivos subidos.",
-        model="gpt-3.5-turbo-0125",
-        tools=[{"type": "file_search"}],
-        tool_resources={
-            "file_search": {
-                "vector_store_ids": [vector_store_id]
-            }
-        }
-    )
-    assistant_id = new_assistant.id
-    print(f"[create_ephemeral_assistant] Created assistant: {assistant_id}")
-
-    # (C) Creamos el thread
-    thread = client.beta.threads.create()
-    thread_id = thread.id
-    print(f"[create_ephemeral_assistant] Created thread: {thread_id}")
-
-    return thread_id, assistant_id, vector_store_id
-
-
-def end_ephemeral_assistant(assistant_id: str, vector_store_id: str):
-    """
-    Borra el assistant y el vector store para que no quede nada persistido.
-    """
-    print(f"[end_ephemeral_assistant] Deleting assistant: {assistant_id}")
-    client.beta.assistants.delete(assistant_id=assistant_id)
-
-    print(f"[end_ephemeral_assistant] Deleting vector store: {vector_store_id}")
-    client.beta.vector_stores.delete(vector_store_id=vector_store_id)
 
 
 # --------------------------------------------------------------------------------
@@ -72,11 +29,11 @@ def end_ephemeral_assistant(assistant_id: str, vector_store_id: str):
 @app.route('/start', methods=['GET'])
 def start_conversation():
     """
-    - Crea un vector store, un assistant y un thread EFÍMEROS.
+    - Crea un vector store, un assistant y un thread EFÍMEROS (desde módulo externo).
     - Devuelve: thread_id, assistant_id, vector_store_id
     """
     print("[/start] Starting new ephemeral conversation...")
-    thread_id, assistant_id, vector_store_id = create_ephemeral_assistant()
+    thread_id, assistant_id, vector_store_id = start_ephemeral_conversation()
     print(f"[/start] ephemeral conversation: thread_id={thread_id}, assistant_id={assistant_id}, vector_store_id={vector_store_id}")
 
     return jsonify({
@@ -84,6 +41,7 @@ def start_conversation():
         "assistant_id": assistant_id,
         "vector_store_id": vector_store_id
     })
+
 
 
 @app.route('/end', methods=['POST'])
@@ -100,7 +58,7 @@ def end_conversation():
         return jsonify({"error": "Missing assistant_id or vector_store_id"}), 400
 
     print(f"[/end] Ending ephemeral conversation for assistant_id={assistant_id}, vector_store_id={vector_store_id}")
-    end_ephemeral_assistant(assistant_id, vector_store_id)
+    end_ephemeral_conversation(assistant_id, vector_store_id)
     return jsonify({"success": True, "message": "Conversation ended. Assistant & vector store deleted."})
 
 
@@ -285,14 +243,27 @@ def list_available_assistants():
         return jsonify({"error": str(e)}), 500
 
 
+SECTION_MAP = {
+    "AUTHORS": "RESEARCHER",
+    "AUTHOR": "RESEARCHER",
+    "RESEARCHERS": "RESEARCHER",
+    "INVESTIGADORES": "RESEARCHER",
+    "TITULO": "TITLE",
+    "TÍTULO": "TITLE",
+    "PROPÓSITO": "PURPOSE"
+    
+}
+
 def modify_latex_document(section, new_content, thread_id):
-    """
-    Lógica auxiliar para modificar secciones en .tex
-    con tu script 'document_manipulation'.
-    """
-    std_section = section.upper().replace(" ", "_")
+
+    std_section = section.upper().replace(" ", "_").replace("<<", "").replace(">>", "")
+    std_section = SECTION_MAP.get(std_section, std_section)
+
+    print(f"[modify_latex_document] Modifying section: {std_section}")
     document_manipulation.update_latex_section(std_section, new_content, thread_id)
     return {"success": True}
+
+
 
 
 if __name__ == '__main__':
