@@ -140,6 +140,10 @@ export default function Home() {
     setInput(e.target.value);
   };
 
+  const handleSetAttachedFiles = ()=>{
+    
+  }
+
   // *** NEW: Al mandar mensaje, añade attachments en el mensaje "user"
   //  y limpia attachedFiles al final (después de la respuesta).
   const handleSendMessage = async (userInput: string) => {
@@ -205,13 +209,15 @@ export default function Home() {
         ...prev,
         { role: "assistant", content: responseData.response },
       ]);
+
+      // *** NEW: Limpiamos la lista de archivos para el próximo envío
+      setAttachedFiles([]);
     } catch (error) {
       console.error("Error sending message:", error);
     } finally {
       setIsLoading(false);
       setIsGenerating(false);
-      // *** NEW: Limpiamos la lista de archivos para el próximo envío
-      setAttachedFiles([]);
+
     }
   };
 
@@ -228,7 +234,9 @@ export default function Home() {
     const files = e.target.files;
     if (files) {
       setAttachedFiles((prev) => [...prev, ...Array.from(files)]);
+      console.log(attachedFiles)
     }
+
     // e.target.value = ""; // si quieres permitir subir el mismo archivo repetido
   };
 
@@ -376,7 +384,7 @@ export default function Home() {
               onSubmit={onSubmit}
               className="relative rounded-lg border bg-background focus-within:ring-1 focus-within:ring-ring"
             >
-              {attachedFiles.length > 0 && (
+              {(attachedFiles.length > 0 && !isLoading) && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {attachedFiles.map((file, index) => (
                     <div
@@ -390,10 +398,12 @@ export default function Home() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() =>
+                        onClick={() =>{
+
                           setAttachedFiles((prev) =>
                             prev.filter((_, i) => i !== index)
                           )
+                        }
                         }
                       >
                         <span className="sr-only">Remove file</span>
