@@ -89,7 +89,10 @@ def chat():
 
     # Subimos cada archivo y lo asociamos al vector store
     for file in uploaded_files:
-        file_path = os.path.join('uploads', file.filename)
+        # file_path = os.path.join(os.getcwd(), 'uploads', file.filename)
+        uploads_path = os.environ.get('UPLOADS_PATH')
+        file_path = os.path.join(uploads_path, file.filename)
+        print(f"File path: {file_path}")
         file.save(file_path)
         print(f"[/chat] Saved file: {file_path}")
 

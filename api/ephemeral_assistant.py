@@ -97,7 +97,7 @@ def start_ephemeral_conversation():
     print(f"[start_ephemeral_conversation] Created thread: {thread_id}")
 
     # (E) Programar la eliminación del asistente después de 2 horas (7200 segundos)
-    timer = threading.Timer(240, end_ephemeral_conversation, [assistant_id, vector_store_id])
+    timer = threading.Timer(7200, end_ephemeral_conversation, [assistant_id, vector_store_id])
     timer.start()
 
     # Copiamos localmente SOLO el .tex para edición en frontend
