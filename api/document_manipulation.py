@@ -1,4 +1,5 @@
 import os
+import requests 
 # Cargar la plantilla LaTeX
 def load_template(filename):
     fallback_file = "invention-disclosure-structure.tex"
@@ -55,6 +56,7 @@ def update_latex_section(section_key: str, new_content: str, thread_id: str):
                 continue
             updated_lines.append(line)
             if marker in line:
+                new_content = sanitize_latex_input(new_content)
                 updated_lines.append(f"{start_tag}\n")
                 updated_lines.append(new_content.strip() + "\n")
                 updated_lines.append(f"{end_tag}\n")
@@ -63,8 +65,35 @@ def update_latex_section(section_key: str, new_content: str, thread_id: str):
         with open(file_path, 'w', encoding='utf-8') as file:
             file.writelines(updated_lines)
 
+        requests.post("http://localhost:5000/compile", json={"thread_id": thread_id})
+        print(f"[compile] ✅ Compilación solicitada para thread_id={thread_id}")
+
     except Exception as e:
         print(f"[edit_section] ⚠️ Error actualizando sección {section_key}: {e}")
+        print(f"[compile] ❌ Error al solicitar compilación: {e}")
 
 
+
+
+
+def sanitize_latex_input(text: str) -> str:
+    """
+    Escapa caracteres problemáticos para LaTeX.
+    """
+    replacements = {
+        '&': r'\&',
+        '%': r'\%',
+        '$': r'\$',
+        '#': r'\#',
+        '_': r'\_',
+        '{': r'\{',
+        '}': r'\}',
+        '~': r'\textasciitilde{}',
+        '^': r'\^{}',
+        '\\': r'\textbackslash{}'
+    }
+
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    return text
 

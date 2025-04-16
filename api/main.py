@@ -61,6 +61,64 @@ def end_conversation():
     end_ephemeral_conversation(assistant_id, vector_store_id)
     return jsonify({"success": True, "message": "Conversation ended. Assistant & vector store deleted."})
 
+import subprocess
+
+import subprocess
+import os
+import shutil
+from flask import jsonify, request
+
+@app.route('/compile', methods=['POST'])
+def compile_latex():
+    data = request.get_json()
+    thread_id = data.get("thread_id")
+
+    tex_path = f"generatedDocuments/{thread_id}.tex"
+    
+    # 📍 Carpeta de salida en el backend (para compilación temporal)
+    backend_output_dir = os.path.join("api", "public", "pdf", thread_id)
+    os.makedirs(backend_output_dir, exist_ok=True)
+
+    try:
+        # ✅ Compilar el PDF usando pdflatex
+        result = subprocess.run(
+            ["E:\\Program Files\\MiKTeX\\miktex\\bin\\x64\\pdflatex.exe",
+             "-interaction=nonstopmode",
+             "-output-directory", backend_output_dir,
+             tex_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True
+        )
+
+        print(f"[compile] ✅ PDF generado para thread_id={thread_id} en backend")
+
+        # 📍 Ruta destino en carpeta pública del frontend
+        frontend_public_path = os.path.join(
+            "E:/Daniel/ID_ICONO/InvestigationDisclosureAI-main/frontend/chatbot-id/public/pdf",
+            thread_id
+        )
+        os.makedirs(frontend_public_path, exist_ok=True)
+
+        # ✅ Copiar PDF al frontend
+        shutil.copyfile(
+            os.path.join(backend_output_dir, f"{thread_id}.pdf"),
+            os.path.join(frontend_public_path, f"{thread_id}.pdf")
+        )
+
+        print(f"[compile] ✅ PDF copiado a frontend/public/pdf/{thread_id}/{thread_id}.pdf")
+
+        return jsonify({"status": "success"})
+
+    except subprocess.CalledProcessError as e:
+        print(f"[compile] ❌ Error pdflatex:\nSTDERR:\n{e.stderr}\nSTDOUT:\n{e.stdout}")
+        return jsonify({"status": "error", "message": e.stderr}), 500
+    except Exception as general_error:
+        print(f"[compile] ❌ Error al copiar PDF al frontend: {general_error}")
+        return jsonify({"status": "error", "message": str(general_error)}), 500
+
+
 
 @app.route('/chat', methods=['POST'])
 def chat():

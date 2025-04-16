@@ -447,14 +447,16 @@ export default function Home() {
 
         {latexContent !== "" && (
           <div className="w-2/5 px-2 h-full overflow-auto">
-            <h2 className="text-lg font-bold mb-4">Vista Previa LaTeX</h2>
-            <div className="border p-4 rounded-lg bg-gray-100">
-              <pre className="text-sm overflow-auto">
-                {latexContent || "La vista previa de LaTeX aparecerá aquí..."}
-              </pre>
-            </div>
+            <h2 className="text-lg font-bold mb-4">Vista Previa PDF</h2>
+            <iframe
+              src={`/pdf/${Cookies.get("thread_id")}/${Cookies.get("thread_id")}.pdf?refresh=${new Date().getTime()}`}
+              className="w-full h-[90vh] border"
+              title="PDF Preview"
+            />
+
           </div>
         )}
+
       </main>
     </>
   );
