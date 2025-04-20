@@ -59,6 +59,8 @@ export default function Home() {
         console.log(`Cookie ya existe ${threadId}`);
         await fetchThreadHistory();
         await fetchDocument();
+      }else{
+        handleSendMessage("Hola!");
       }
     };
 
