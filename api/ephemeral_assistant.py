@@ -30,11 +30,11 @@ def start_ephemeral_conversation():
     # Archivos a subir
     FILES_TO_UPLOAD = [
         {
-            "path": "E:/Daniel/ID_ICONO/InvestigationDisclosureAI-main/api/invention-disclosure-structure.tex",
+            "path": "C:/Users/DREAMFYRE 5/Desktop/Proyectos/IDv2/api/invention-disclosure-structure.tex",
             "copy_to_local": True  # solo este debe guardarse como .tex para editar en frontend
         },
         {
-            "path": "E:/Daniel/ID_ICONO/InvestigationDisclosureAI-main/api/invention-disclosure-instructions.md",
+            "path": "C:/Users/DREAMFYRE 5/Desktop/Proyectos/IDv2/api/invention-disclosure-instructions.md",
             "copy_to_local": False
         }
     ]

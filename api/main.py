@@ -76,13 +76,13 @@ def compile_latex():
     tex_path = f"generatedDocuments/{thread_id}.tex"
     
     # 📍 Carpeta de salida en el backend (para compilación temporal)
-    backend_output_dir = os.path.join("api", "public", "pdf", thread_id)
+    backend_output_dir = os.path.join("public/pdf", thread_id)
     os.makedirs(backend_output_dir, exist_ok=True)
 
     try:
         # ✅ Compilar el PDF usando pdflatex
         result = subprocess.run(
-            ["E:\\Program Files\\MiKTeX\\miktex\\bin\\x64\\pdflatex.exe",
+            ["C:/Program Files/MiKTeX/miktex/bin/x64/pdflatex.exe",
              "-interaction=nonstopmode",
              "-output-directory", backend_output_dir,
              tex_path],
@@ -96,7 +96,7 @@ def compile_latex():
 
         # 📍 Ruta destino en carpeta pública del frontend
         frontend_public_path = os.path.join(
-            "E:/Daniel/ID_ICONO/InvestigationDisclosureAI-main/frontend/chatbot-id/public/pdf",
+            "C:/Users/DREAMFYRE 5/Desktop/Proyectos/IDv2/frontend/chatbot-id/public/pdf",
             thread_id
         )
         os.makedirs(frontend_public_path, exist_ok=True)

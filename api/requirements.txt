@@ -2,7 +2,7 @@ Flask
 Flask-CORS
 requests
 python-dotenv
-openai
+openai==1.63.0
 PyPDF2
 langchain
 faiss-cpu
