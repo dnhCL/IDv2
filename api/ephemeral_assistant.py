@@ -1,19 +1,22 @@
-# ephemeral_assistant.py
-
 import os
 from openai import OpenAI
 from assistant_instructions import instructions  # Tus instrucciones base, si las tienes
 from dotenv import load_dotenv
 import shutil
 
-
-# Cargamos variables de entorno
+# Cargamos las variables de entorno desde el archivo .env
 load_dotenv()
+
+# Accedemos a las variables de entorno
 OPENAI_API_KEY = os.environ['OPEN_AI_API_KEY']
+UPLOADS_PATH = os.environ['UPLOADS_PATH']
+FILES_TO_UPLOAD_STRUCTURE_PATH = os.environ['FILES_TO_UPLOAD_STRUCTURE_PATH']
+FILES_TO_UPLOAD_STRUCTURE_COPY_TO_LOCAL = os.environ['FILES_TO_UPLOAD_STRUCTURE_COPY_TO_LOCAL'] == 'True'
+FILES_TO_UPLOAD_INSTRUCTIONS_PATH = os.environ['FILES_TO_UPLOAD_INSTRUCTIONS_PATH']
+FILES_TO_UPLOAD_INSTRUCTIONS_COPY_TO_LOCAL = os.environ['FILES_TO_UPLOAD_INSTRUCTIONS_COPY_TO_LOCAL'] == 'True'
 
-# Creamos el cliente
+# Creamos el cliente OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY)
-
 
 def start_ephemeral_conversation():
     """
@@ -27,15 +30,15 @@ def start_ephemeral_conversation():
     vector_store_id = vs_response.id
     print(f"[start_ephemeral_conversation] Created vector store: {vector_store_id}")
 
-    # Archivos a subir
+    # Archivos a subir, ahora con las rutas y copias basadas en las variables de entorno
     FILES_TO_UPLOAD = [
         {
-            "path": "C:/Users/DREAMFYRE 5/Desktop/Proyectos/IDv2/api/invention-disclosure-structure.tex",
-            "copy_to_local": True  # solo este debe guardarse como .tex para editar en frontend
+            "path": FILES_TO_UPLOAD_STRUCTURE_PATH,
+            "copy_to_local": FILES_TO_UPLOAD_STRUCTURE_COPY_TO_LOCAL
         },
         {
-            "path": "C:/Users/DREAMFYRE 5/Desktop/Proyectos/IDv2/api/invention-disclosure-instructions.md",
-            "copy_to_local": False
+            "path": FILES_TO_UPLOAD_INSTRUCTIONS_PATH,
+            "copy_to_local": FILES_TO_UPLOAD_INSTRUCTIONS_COPY_TO_LOCAL
         }
     ]
 
@@ -61,25 +64,19 @@ def start_ephemeral_conversation():
         name="EphemeralAssistant",
         instructions=instructions,
         model="gpt-4o",
-        tools=[
-            {"type": "file_search"},
-            {
-                "type": "function",
-                "function": {
-                    "name": "modify_document",
-                    "description": "Modify a LaTeX document section by replacing placeholder with given content.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "Section": {"type": "string"},
-                            "Content": {"type": "string"},
-                        },
-                        "required": ["Section", "Content"]
-                    }
-                }
-            }
-        ]
-        ,
+        tools=[{"type": "file_search"},
+               {"type": "function", "function": {
+                   "name": "modify_document",
+                   "description": "Modify a LaTeX document section by replacing placeholder with given content.",
+                   "parameters": {
+                       "type": "object",
+                       "properties": {
+                           "Section": {"type": "string"},
+                           "Content": {"type": "string"}
+                       },
+                       "required": ["Section", "Content"]
+                   }
+               }}],
         tool_resources={
             "file_search": {
                 "vector_store_ids": [vector_store_id]
@@ -95,18 +92,16 @@ def start_ephemeral_conversation():
 
     # Copiamos localmente SOLO el .tex para edición en frontend
     try:
-        tex_file = FILES_TO_UPLOAD[0]["path"]  # asumimos que es el primero
-        os.makedirs("generatedDocuments", exist_ok=True)
-        local_copy = f"generatedDocuments/{thread_id}.tex"
-        shutil.copyfile(tex_file, local_copy)
-        print(f"[start_ephemeral_conversation] Copied LaTeX to: {local_copy}")
+        if FILES_TO_UPLOAD[0]["copy_to_local"]:  # Solo copiamos si se indica
+            tex_file = FILES_TO_UPLOAD[0]["path"]  # Asumimos que el .tex es el primero
+            os.makedirs("generatedDocuments", exist_ok=True)
+            local_copy = f"generatedDocuments/{thread_id}.tex"
+            shutil.copyfile(tex_file, local_copy)
+            print(f"[start_ephemeral_conversation] Copied LaTeX to: {local_copy}")
     except Exception as e:
         print(f"[start_ephemeral_conversation] ERROR copying LaTeX locally: {e}")
 
-
     return thread_id, assistant_id, vector_store_id
-
-
 
 def end_ephemeral_conversation(assistant_id: str, vector_store_id: str):
     """

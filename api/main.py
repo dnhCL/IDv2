@@ -76,7 +76,7 @@ def compile_latex():
     tex_path = f"generatedDocuments/{thread_id}.tex"
     
     # 📍 Carpeta de salida en el backend (para compilación temporal)
-    backend_output_dir = os.path.join("public/pdf", thread_id)
+    backend_output_dir = os.path.join(os.getenv("BACKEND_OUTPUT_DIR"), thread_id)
     os.makedirs(backend_output_dir, exist_ok=True)
 
     try:
@@ -95,8 +95,7 @@ def compile_latex():
         print(f"[compile] ✅ PDF generado para thread_id={thread_id} en backend")
 
         # 📍 Ruta destino en carpeta pública del frontend
-        frontend_public_path = os.path.join(
-            "C:/Users/DREAMFYRE 5/Desktop/Proyectos/IDv2/frontend/chatbot-id/public/pdf",
+        frontend_public_path = os.path.join(os.getenv("FRONTEND_PUBLIC_PATH"),
             thread_id
         )
         os.makedirs(frontend_public_path, exist_ok=True)
