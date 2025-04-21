@@ -7,7 +7,7 @@ import requests
 import json
 from flask_cors import CORS
 from ephemeral_assistant import start_ephemeral_conversation, end_ephemeral_conversation
-
+import threading
 
 
 # Carga variables de entorno
@@ -146,7 +146,8 @@ def chat():
 
     # Subimos cada archivo y lo asociamos al vector store
     for file in uploaded_files:
-        file_path = os.path.join('uploads', file.filename)
+        uploads_path = os.environ.get('UPLOADS_PATH')
+        file_path = os.path.join(uploads_path, file.filename)
         file.save(file_path)
         print(f"[/chat] Saved file: {file_path}")
 
