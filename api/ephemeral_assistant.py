@@ -3,6 +3,7 @@ from openai import OpenAI
 from assistant_instructions import instructions  # Tus instrucciones base, si las tienes
 from dotenv import load_dotenv
 import shutil
+import threading
 
 # Cargamos las variables de entorno desde el archivo .env
 load_dotenv()
@@ -89,6 +90,10 @@ def start_ephemeral_conversation():
     thread = client.beta.threads.create()
     thread_id = thread.id
     print(f"[start_ephemeral_conversation] Created thread: {thread_id}")
+
+    # (E) Programar la eliminación del asistente después de 2 horas (7200 segundos)
+    timer = threading.Timer(180, end_ephemeral_conversation, [assistant_id, vector_store_id])
+    timer.start()
 
     # Copiamos localmente SOLO el .tex para edición en frontend
     try:
