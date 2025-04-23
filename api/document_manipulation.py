@@ -1,6 +1,9 @@
 import os
 import requests 
 # Cargar la plantilla LaTeX
+
+
+
 def load_template(filename):
     fallback_file = "invention-disclosure-structure.tex"
     try:
