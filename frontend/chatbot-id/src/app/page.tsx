@@ -49,6 +49,10 @@ export default function Home() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [latexContent, setLatexContent] = useState<string>(""); // Para manejar el contenido LaTeX
 
+   // Estado para verificar si el PDF existe
+   const [pdfExists, setPdfExists] = useState(false);
+
+
   const messagesRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -59,6 +63,7 @@ export default function Home() {
         console.log(`Cookie ya existe ${threadId}`);
         await fetchThreadHistory();
         await fetchDocument();
+        checkPdfExistence(threadId); // Verificar si el PDF existe cuando ya hay un hilo
       }else{
         handleSendMessage("Hola!");
       }
@@ -72,7 +77,27 @@ export default function Home() {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }
     fetchDocument();
+    const threadId = Cookies.get("thread_id");
+      if (threadId) {
+        checkPdfExistence(threadId); // Verificar si el PDF existe cuando ya hay un hilo
+      }
+    
   }, [messages]);
+
+   // Verificar si el PDF existe en el backend
+   const checkPdfExistence = async (threadId: string) => {
+    try {
+      const response = await fetch(`/pdf/${threadId}/${threadId}.pdf`, { method: "HEAD" });
+      if (response.ok) {
+        setPdfExists(true); // El archivo PDF existe
+      } else {
+        setPdfExists(false); // El archivo PDF no existe
+      }
+    } catch (error) {
+      console.error("Error checking PDF existence:", error);
+      setPdfExists(false); // Si hay un error, asumimos que el archivo no existe
+    }
+  };
 
   const fetchDocument = async () => {
     const response = await fetch(
@@ -447,7 +472,7 @@ export default function Home() {
           </div>
         </div>
 
-        {latexContent !== "" && (
+        {latexContent !== "" && pdfExists&& (
           <div className="w-2/5 px-2 h-full overflow-auto">
             <h2 className="text-lg font-bold mb-4">Vista Previa PDF</h2>
             <iframe
