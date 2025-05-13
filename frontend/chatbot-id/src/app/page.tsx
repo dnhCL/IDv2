@@ -132,9 +132,9 @@ export default function Home() {
           return true;
         } else {
           // Si el thread_id no es válido
-            Cookies.remove("assistant_id");
-            Cookies.remove("thread_id");
-            Cookies.remove("vectore_store_id");
+          Cookies.remove("assistant_id");
+          Cookies.remove("thread_id");
+          Cookies.remove("vectore_store_id");
           return false;
         }
       } else {
@@ -196,7 +196,7 @@ export default function Home() {
       // data tiene: { thread_id, assistant_id, vector_store_id }
       // Guardarlos en cookies
       let expirationDays = parseInt(`${process.env.COOKIES_DURATION}`) / 1440;
-      
+
       Cookies.set("thread_id", data.thread_id, { expires: expirationDays });
       Cookies.set("assistant_id", data.assistant_id, { expires: expirationDays });
       Cookies.set("vector_store_id", data.vector_store_id, { expires: expirationDays });
@@ -219,6 +219,79 @@ export default function Home() {
 
   // *** NEW: Al mandar mensaje, añade attachments en el mensaje "user"
   //  y limpia attachedFiles al final (después de la respuesta).
+  // const handleSendMessage = async (userInput: string) => {
+  //   setIsLoading(true);
+
+  //   // 1) Añadimos un "mensaje de usuario" al estado con attachments
+  //   setMessages((prev) => [
+  //     ...prev,
+  //     {
+  //       role: "user",
+  //       content: userInput,
+  //       attachments: attachedFiles.map((f) => ({ name: f.name })), // *** store names
+  //     },
+  //   ]);
+
+  //   try {
+  //     let threadId = Cookies.get("thread_id");
+  //     let assistantId = Cookies.get("assistant_id");
+  //     let vectorStoreId = Cookies.get("vector_store_id");
+
+  //     if (!threadId || !assistantId || !vectorStoreId) {
+  //       const newData = await fetchNewThread();
+  //       if (newData) {
+  //         threadId = newData.thread_id;
+  //         assistantId = newData.assistant_id;
+  //         vectorStoreId = newData.vector_store_id;
+  //         console.log("Cookies creadas para nueva conversación efímera");
+  //       } else {
+  //         console.log("Error al generar el thread");
+  //         return;
+  //       }
+  //     }
+
+  //     // 2) Creamos FormData con message y los archivos
+  //     const formData = new FormData();
+  //     formData.append("message", userInput);
+  //     formData.append("thread_id", threadId ?? "");
+  //     formData.append("assistant_id", assistantId ?? "");
+  //     formData.append("vector_store_id", vectorStoreId ?? "");
+
+  //     attachedFiles.forEach((file) => {
+  //       formData.append("files", file);
+  //     });
+
+  //     // *** NO limpiamos "attachedFiles" aquí todavía
+
+  //     const response = await fetch(
+  //       `${process.env.NEXT_PUBLIC_API_URL}/chat`,
+  //       {
+  //         method: "POST",
+  //         body: formData,
+  //       }
+  //     );
+
+  //     if (!response.ok) {
+  //       throw new Error(`Error sending message: ${response.statusText}`);
+  //     }
+
+  //     const responseData = await response.json();
+
+  //     // 3) Añadimos la respuesta del asistente al estado
+  //     setMessages((prev) => [
+  //       ...prev,
+  //       { role: "assistant", content: responseData.response },
+  //     ]);
+  //   } catch (error) {
+  //     console.error("Error sending message:", error);
+  //   } finally {
+  //     setIsLoading(false);
+  //     setIsGenerating(false);
+  //     // *** NEW: Limpiamos la lista de archivos para el próximo envío
+  //     setAttachedFiles([]);
+  //   }
+  // };
+
   const handleSendMessage = async (userInput: string) => {
     setIsLoading(true);
 
@@ -257,11 +330,10 @@ export default function Home() {
       formData.append("assistant_id", assistantId ?? "");
       formData.append("vector_store_id", vectorStoreId ?? "");
 
+      // Solo enviamos los archivos adjuntos actuales
       attachedFiles.forEach((file) => {
         formData.append("files", file);
       });
-
-      // *** NO limpiamos "attachedFiles" aquí todavía
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/chat`,
@@ -287,7 +359,7 @@ export default function Home() {
     } finally {
       setIsLoading(false);
       setIsGenerating(false);
-      // *** NEW: Limpiamos la lista de archivos para el próximo envío
+      // Limpiamos los archivos después de haber enviado el mensaje
       setAttachedFiles([]);
     }
   };
@@ -305,6 +377,7 @@ export default function Home() {
     const files = e.target.files;
     if (files) {
       setAttachedFiles((prev) => [...prev, ...Array.from(files)]);
+      console.log(attachedFiles);
     }
     // e.target.value = ""; // si quieres permitir subir el mismo archivo repetido
   };
@@ -368,7 +441,7 @@ export default function Home() {
 
       <main className="h-[75vh] w-full flex items-center justify-center mx-auto py-6">
         <div
-          className={`${(latexContent === ""  && pdfExists) ? "w-full max-w-6xl h-full" : "w-3/5 h-full px-4"
+          className={`${(latexContent === "" && pdfExists) ? "w-full max-w-6xl h-full" : "w-3/5 h-full px-4"
             }`}
         >
           <ChatMessageList ref={messagesRef}>
