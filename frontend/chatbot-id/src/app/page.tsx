@@ -49,8 +49,8 @@ export default function Home() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [latexContent, setLatexContent] = useState<string>(""); // Para manejar el contenido LaTeX
 
-   // Estado para verificar si el PDF existe
-   const [pdfExists, setPdfExists] = useState(false);
+  // Estado para verificar si el PDF existe
+  const [pdfExists, setPdfExists] = useState(false);
 
 
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -59,12 +59,13 @@ export default function Home() {
   useEffect(() => {
     const handleExistingThread = async () => {
       const threadId = Cookies.get("thread_id");
-      if (threadId) {
+      const response = await validateAssistantId()
+      if (threadId && response) {
         console.log(`Cookie ya existe ${threadId}`);
         await fetchThreadHistory();
         await fetchDocument();
         checkPdfExistence(threadId); // Verificar si el PDF existe cuando ya hay un hilo
-      }else{
+      } else {
         handleSendMessage("Hola!");
       }
     };
@@ -76,16 +77,29 @@ export default function Home() {
     if (messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }
-    fetchDocument();
-    const threadId = Cookies.get("thread_id");
-      if (threadId) {
-        checkPdfExistence(threadId); // Verificar si el PDF existe cuando ya hay un hilo
+    const handleFetchDocument = async () => {
+      try {
+        const threadId = Cookies.get("thread_id");
+        const response = await validateAssistantId();
+        if (threadId && response) {
+          await fetchDocument();
+        }
+      } catch (error) {
+        console.error("Error al obtener el documento:", error);
       }
-    
+    }
+
+    handleFetchDocument()
+
+    const threadId = Cookies.get("thread_id");
+    if (threadId) {
+      checkPdfExistence(threadId); // Verificar si el PDF existe cuando ya hay un hilo
+    }
+
   }, [messages]);
 
-   // Verificar si el PDF existe en el backend
-   const checkPdfExistence = async (threadId: string) => {
+  // Verificar si el PDF existe en el backend
+  const checkPdfExistence = async (threadId: string) => {
     try {
       const response = await fetch(`/pdf/${threadId}/${threadId}.pdf`, { method: "HEAD" });
       if (response.ok) {
@@ -96,6 +110,40 @@ export default function Home() {
     } catch (error) {
       console.error("Error checking PDF existence:", error);
       setPdfExists(false); // Si hay un error, asumimos que el archivo no existe
+    }
+  };
+
+  const validateAssistantId = async () => {
+    try {
+      // Aquí se hace la solicitud a la API de OpenAI para validar el thread_id
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/listAssistants`);
+      const assistId = Cookies.get("assistant_id");
+      console.log(assistId);
+
+
+      if (response.ok && !!assistId && assistId !== "") {
+        const data = await response.json();
+        console.log("data", data);
+        const valido = data.includes(assistId);
+        console.log(valido);
+
+        if (valido) {
+          // Si el thread_id es válido
+          return true;
+        } else {
+          // Si el thread_id no es válido
+            Cookies.remove("assistant_id");
+            Cookies.remove("thread_id");
+            Cookies.remove("vectore_store_id");
+          return false;
+        }
+      } else {
+        // console.error("Error en la validación del thread_id:", response.statusText);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error al validar el thread_id:", error);
+      return false;
     }
   };
 
@@ -147,9 +195,11 @@ export default function Home() {
 
       // data tiene: { thread_id, assistant_id, vector_store_id }
       // Guardarlos en cookies
-      Cookies.set("thread_id", data.thread_id, { expires: 1 / 24 }); // 1 hora
-      Cookies.set("assistant_id", data.assistant_id, { expires: 1 / 24 });
-      Cookies.set("vector_store_id", data.vector_store_id, { expires: 1 / 24 });
+      let expirationDays = parseInt(`${process.env.COOKIES_DURATION}`) / 1440;
+      
+      Cookies.set("thread_id", data.thread_id, { expires: expirationDays });
+      Cookies.set("assistant_id", data.assistant_id, { expires: expirationDays });
+      Cookies.set("vector_store_id", data.vector_store_id, { expires: expirationDays });
 
       return {
         thread_id: data.thread_id,
@@ -318,9 +368,8 @@ export default function Home() {
 
       <main className="h-[75vh] w-full flex items-center justify-center mx-auto py-6">
         <div
-          className={`${
-            latexContent === "" ? "w-full max-w-6xl h-full" : "w-3/5 h-full px-4"
-          }`}
+          className={`${(latexContent === ""  && pdfExists) ? "w-full max-w-6xl h-full" : "w-3/5 h-full px-4"
+            }`}
         >
           <ChatMessageList ref={messagesRef}>
             {/* Initial Message */}
@@ -472,7 +521,7 @@ export default function Home() {
           </div>
         </div>
 
-        {latexContent !== "" && pdfExists&& (
+        {latexContent !== "" && pdfExists && (
           <div className="w-2/5 px-2 h-full overflow-auto">
             <h2 className="text-lg font-bold mb-4">Vista Previa PDF</h2>
             <iframe

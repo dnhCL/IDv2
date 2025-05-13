@@ -42,8 +42,6 @@ def start_conversation():
         "vector_store_id": vector_store_id
     })
 
-
-
 @app.route('/end', methods=['POST'])
 def end_conversation():
     """
@@ -60,8 +58,6 @@ def end_conversation():
     print(f"[/end] Ending ephemeral conversation for assistant_id={assistant_id}, vector_store_id={vector_store_id}")
     end_ephemeral_conversation(assistant_id, vector_store_id)
     return jsonify({"success": True, "message": "Conversation ended. Assistant & vector store deleted."})
-
-import subprocess
 
 import subprocess
 import os
@@ -116,7 +112,6 @@ def compile_latex():
     except Exception as general_error:
         print(f"[compile] ❌ Error al copiar PDF al frontend: {general_error}")
         return jsonify({"status": "error", "message": str(general_error)}), 500
-
 
 
 @app.route('/chat', methods=['POST'])
@@ -321,10 +316,6 @@ def modify_latex_document(section, new_content, thread_id):
     document_manipulation.update_latex_section(std_section, new_content, thread_id)
     return {"success": True}
 
-
-
-
 if __name__ == '__main__':
     print("[main] Starting Flask server...")
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
-
