@@ -383,7 +383,7 @@ export default function Home() {
     if (files && files?.length > 0) {
       console.log("setear attached files", attachedFiles, Array.from(files));
       const newFiles = [...attachedFiles, ...Array.from(files)];
-      // Definiendo previamente el nuevo estado attachedFiles, se evitan los errores
+      // Definiendo previamente el nuevo estado attachedFiles, se evitan los errores de adjuntar archivos
       setAttachedFiles(newFiles);
       console.log("attachedFiles", attachedFiles.length);
     }else{
