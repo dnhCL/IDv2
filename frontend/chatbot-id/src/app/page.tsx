@@ -98,6 +98,10 @@ export default function Home() {
 
   }, [messages]);
 
+  useEffect(()=>{
+    console.log("attachedFiles final", attachedFiles);
+  },[attachedFiles])
+
   // Verificar si el PDF existe en el backend
   const checkPdfExistence = async (threadId: string) => {
     try {
@@ -375,10 +379,17 @@ export default function Home() {
   // *** La parte de adjuntar archivos
   const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      setAttachedFiles((prev) => [...prev, ...Array.from(files)]);
-      console.log(attachedFiles);
+    console.log("files en handlefileattach", files)
+    if (files && files?.length > 0) {
+      console.log("setear attached files", attachedFiles, Array.from(files));
+      const newFiles = [...attachedFiles, ...Array.from(files)];
+      // Definiendo previamente el nuevo estado attachedFiles, se evitan los errores
+      setAttachedFiles(newFiles);
+      console.log("attachedFiles", attachedFiles.length);
+    }else{
+      console.log("no hay archivos seleccionados");
     }
+
     // e.target.value = ""; // si quieres permitir subir el mismo archivo repetido
   };
 
@@ -525,7 +536,7 @@ export default function Home() {
               onSubmit={onSubmit}
               className="relative rounded-lg border bg-background focus-within:ring-1 focus-within:ring-ring"
             >
-              {attachedFiles.length > 0 && (
+              {(attachedFiles.length > 0 && !isLoading) && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {attachedFiles.map((file, index) => (
                     <div
