@@ -1,0 +1,7 @@
+Titulo: Estudio de calidad de suelo.
+
+Investigadores: D. Collins
+
+Descripcion: Caracterizacion y diagnostico de las condiciones del suelo en Chile.
+
+Estado del arte: No se han realizado estudios previamente.
